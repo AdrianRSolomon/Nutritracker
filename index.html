@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kalo - Nutrition & Fitness Platform</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Firebase Web SDKs (Backend & Google Auth Ready) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            dark: { bg: '#0B0F15', card: '#141A23', border: '#212A38', input: '#1A222D' },
+            lime: { accent: '#A3E635', hover: '#84CC16', glow: 'rgba(163, 230, 53, 0.15)' }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    body { background-color: #0B0F15; color: #F3F4F6; font-family: system-ui, -apple-system, sans-serif; }
+    .glass-card { background: #141A23; border: 1px solid #212A38; border-radius: 1.25rem; }
+    .lime-ring { stroke: #A3E635; stroke-dasharray: 283; stroke-dashoffset: 65; transition: stroke-dashoffset 0.5s ease; }
+    .bottom-dock { background: rgba(20, 26, 35, 0.9); backdrop-filter: blur(12px); border-top: 1px solid #212A38; }
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="min-h-screen pb-24 text-slate-100 selection:bg-lime-accent selection:text-black">
+
+  <!-- Top App Navigation -->
+  <header class="sticky top-0 z-40 bg-dark-bg/80 backdrop-blur-md border-b border-dark-border px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-lime-accent flex items-center justify-center text-black font-extrabold text-lg">K</div>
+      <div>
+        <h1 class="font-bold text-base leading-tight">Kalo NutriFit</h1>
+        <p class="text-xs text-slate-400" id="client-header-subtitle">Active Client: Jane Doe</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <select id="client-switcher" onchange="switchClient(this.value)" class="bg-dark-input text-xs text-slate-200 border border-dark-border rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-lime-accent">
+        <option value="jane_doe">Jane Doe (Recomp)</option>
+        <option value="alex_smith">Alex Smith (Muscle Gain)</option>
+      </select>
+      <button onclick="loginWithGoogle()" class="bg-lime-accent hover:bg-lime-hover text-black text-xs font-semibold px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12.24 10.285V13.4h6.887c-.58 2.719-2.855 4.6-6.887 4.6-4.146 0-7.5-3.354-7.5-7.5s3.354-7.5 7.5-7.5c1.815 0 3.47.65 4.755 1.725l2.405-2.405C17.925 1.05 15.255 0 12.24 0 5.48 0 0 5.48 0 12.24s5.48 12.24 12.24 12.24c7.07 0 11.76-4.97 11.76-11.96 0-.8-.08-1.58-.2-2.235H12.24z"/></svg>
+        Sign In
+      </button>
+    </div>
+  </header>
+
+  <main class="max-w-md mx-auto px-4 pt-4 space-y-5">
+
+    <!-- View 1: Today Dashboard -->
+    <section id="view-today" class="space-y-5">
+      
+      <!-- Weekly Progress Banner -->
+      <div class="glass-card p-4 flex items-center justify-between border-l-4 border-l-lime-accent">
+        <div>
+          <span class="text-xs font-semibold text-lime-accent uppercase tracking-wider">Daily Intake</span>
+          <h2 class="text-lg font-bold text-white">Your Weekly Progress</h2>
+          <p class="text-xs text-slate-400 mt-0.5" id="streak-label font-medium">6 Day Consistency Streak 🔥</p>
+        </div>
+        <div class="relative w-14 h-14 flex items-center justify-center">
+          <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
+            <path class="text-dark-border" stroke-width="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+            <path class="text-lime-accent" stroke-dasharray="85, 100" stroke-width="3.5" stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+          </svg>
+          <span class="absolute text-xs font-bold text-white">65%</span>
+        </div>
+      </div>
+
+      <!-- Main Calorie & Macro Target Card -->
+      <div class="glass-card p-5 relative overflow-hidden">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <p class="text-xs text-slate-400">Calories Consumed</p>
+            <div class="flex items-baseline gap-2 mt-0.5">
+              <span id="consumed-cal" class="text-3xl font-extrabold text-white">1,420</span>
+              <span class="text-xs text-slate-400">/ <span id="target-cal">1,850</span> Kcal</span>
+            </div>
+          </div>
+          <div class="text-right">
+            <span id="remaining-cal" class="text-sm font-bold text-lime-accent">430 Kcal</span>
+            <p class="text-[10px] text-slate-400">Remaining</p>
+          </div>
+        </div>
+
+        <!-- Macro Breakdown Bars -->
+        <div class="grid grid-cols-3 gap-2 pt-2 border-t border-dark-border">
+          <div>
+            <div class="flex justify-between text-[11px] mb-1">
+              <span class="text-slate-400">Protein</span>
+              <span id="protein-count" class="font-bold text-lime-accent">115/150g</span>
+            </div>
+            <div class="h-1.5 bg-dark-input rounded-full overflow-hidden">
+              <div id="protein-bar" class="h-full bg-lime-accent rounded-full" style="width: 76%"></div>
+            </div>
+          </div>
+          <div>
+            <div class="flex justify-between text-[11px] mb-1">
+              <span class="text-slate-400">Carbs</span>
+              <span id="carb-count" class="font-bold text-blue-400">140/178g</span>
+            </div>
+            <div class="h-1.5 bg-dark-input rounded-full overflow-hidden">
+              <div id="carb-bar" class="h-full bg-blue-400 rounded-full" style="width: 78%"></div>
+            </div>
+          </div>
+          <div>
+            <div class="flex justify-between text-[11px] mb-1">
+              <span class="text-slate-400">Fats</span>
+              <span id="fat-count" class="font-bold text-amber-400">48/60g</span>
+            </div>
+            <div class="h-1.5 bg-dark-input rounded-full overflow-hidden">
+              <div id="fat-bar" class="h-full bg-amber-400 rounded-full" style="width: 80%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Metrics Grid -->
+      <div class="grid grid-cols-2 gap-3">
+        <div class="glass-card p-3.5 flex items-center justify-between">
+          <div>
+            <p class="text-[11px] text-slate-400">Daily Steps</p>
+            <p class="text-base font-bold text-white mt-0.5" id="step-count">6,400 <span class="text-[10px] text-slate-400 font-normal">steps</span></p>
+          </div>
+          <div class="w-8 h-8 rounded-lg bg-orange-500/10 text-orange-400 flex items-center justify-center">👟</div>
+        </div>
+        <div class="glass-card p-3.5 flex items-center justify-between">
+          <div>
+            <p class="text-[11px] text-slate-400">Water Intake</p>
+            <p class="text-base font-bold text-white mt-0.5" id="water-count">8 / 10 <span class="text-[10px] text-slate-400 font-normal">glasses</span></p>
+          </div>
+          <div class="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center">💧</div>
+        </div>
+      </div>
+
+      <!-- Meals & Logging Section -->
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="font-bold text-sm text-white">Daily Meals</h3>
+          <span class="text-xs text-lime-accent font-medium">Editable Plan</span>
+        </div>
+
+        <div id="meal-list-container" class="space-y-2.5">
+          <!-- Meal cards rendered dynamically -->
+        </div>
+      </div>
+
+      <!-- Optional Workout Log Summary Module -->
+      <div class="glass-card p-4 space-y-3 border border-dark-border">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="font-bold text-sm text-white flex items-center gap-1.5">
+              <span>🏋️</span> Optional Workout Log
+            </h3>
+            <p class="text-[11px] text-slate-400">Track training volume alongside your nutrition</p>
+          </div>
+          <button onclick="toggleWorkoutModal()" class="text-xs bg-lime-accent/10 text-lime-accent font-semibold px-2.5 py-1 rounded-lg hover:bg-lime-accent hover:text-black transition-all">
+            + Log Session
+          </button>
+        </div>
+        <div id="logged-workouts-container" class="space-y-2 text-xs text-slate-300">
+          <div class="bg-dark-input p-2.5 rounded-xl flex items-center justify-between">
+            <div>
+              <p class="font-semibold text-white">Upper Body Strength</p>
+              <p class="text-[10px] text-slate-400">45 mins • 4 exercises • 320 kcal est.</p>
+            </div>
+            <span class="text-[10px] bg-lime-accent/20 text-lime-accent px-2 py-0.5 rounded font-medium">Completed</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Editable Recommended Grocery List -->
+      <div class="glass-card p-4 space-y-3">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="font-bold text-sm text-white flex items-center gap-1.5">
+              <span>🛒</span> Recommended Grocery List
+            </h3>
+            <p class="text-[11px] text-slate-400">Auto-generated from your meal targets</p>
+          </div>
+        </div>
+
+        <div class="flex gap-2">
+          <input type="text" id="new-grocery-item" placeholder="Add custom grocery item..." class="flex-1 bg-dark-input text-xs text-white border border-dark-border rounded-xl px-3 py-2 focus:outline-none focus:border-lime-accent">
+          <button onclick="addGroceryItem()" class="bg-lime-accent hover:bg-lime-hover text-black font-semibold text-xs px-3.5 py-2 rounded-xl transition-all">Add</button>
+        </div>
+
+        <div id="grocery-items-list" class="space-y-1.5 pt-1">
+          <!-- Grocery Items Rendered Dynamically -->
+        </div>
+      </div>
+
+    </section>
+
+    <!-- View 2: Nutrition & Goal Calculator (Pillar 2) -->
+    <section id="view-calculator" class="hidden space-y-5">
+      <div class="glass-card p-5 space-y-4">
+        <h2 class="text-base font-bold text-white border-b border-dark-border pb-2">Evidence-Informed Macro Calculator</h2>
+        
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-xs text-slate-400">Age</label>
+            <input type="number" id="calc-age" value="30" class="w-full bg-dark-input text-sm font-semibold text-white border border-dark-border rounded-xl px-3 py-2 mt-1">
+          </div>
+          <div>
+            <label class="text-xs text-slate-400">Biological Sex</label>
+            <select id="calc-sex" class="w-full bg-dark-input text-sm font-semibold text-white border border-dark-border rounded-xl px-3 py-2 mt-1">
+              <option value="female" selected>Female</option>
+              <option value="male">Male</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-xs text-slate-400">Weight (lbs)</label>
+            <input type="number" id="calc-weight" value="210" class="w-full bg-dark-input text-sm font-semibold text-white border border-dark-border rounded-xl px-3 py-2 mt-1">
+          </div>
+          <div>
+            <label class="text-xs text-slate-400">Height (ft / in)</label>
+            <input type="text" id="calc-height" value="5'6&quot;" class="w-full bg-dark-input text-sm font-semibold text-white border border-dark-border rounded-xl px-3 py-2 mt-1">
+          </div>
+        </div>
+
+        <div>
+          <label class="text-xs text-slate-400">Primary Goal Path</label>
+          <select id="calc-goal" class="w-full bg-dark-input text-sm font-semibold text-white border border-dark-border rounded-xl px-3 py-2 mt-1">
+            <option value="FAT_LOSS">Fat Loss (20% Energy Deficit)</option>
+            <option value="MUSCLE_GAIN">Muscle Building (8% Energy Surplus)</option>
+            <option value="RECOMP" selected>Body Recomposition (Maintenance + High Protein)</option>
+            <option value="WELLNESS">Weight Maintenance & General Wellness</option>
+          </select>
+        </div>
+
+        <button onclick="recalculateMacros()" class="w-full bg-lime-accent hover:bg-lime-hover text-black font-bold text-sm py-2.5 rounded-xl transition-all">
+          Calculate Target Estimates
+        </button>
+      </div>
+
+      <div class="glass-card p-5 space-y-3">
+        <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Calculation Assumptions</h3>
+        <ul class="text-xs text-slate-300 space-y-2 list-disc pl-4">
+          <li><strong>BMR Equation:</strong> Mifflin-St Jeor formula ($10\times\text{kg} + 6.25\times\text{cm} - 5\times\text{age} + s$).</li>
+          <li><strong>Protein Allocation:</strong> Tailored to target body weight ($1.8 - 2.2 \text{ g/kg}$).</li>
+          <li><strong>Calorie Disclaimers:</strong> All estimates are starting markers to be adjusted based on weekly body composition response.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- View 3: Progress & Kalo Analytics (Pillar 5) -->
+    <section id="view-progress" class="hidden space-y-5">
+      <div class="glass-card p-5 space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-base font-bold text-white">Progress Trends</h2>
+          <span class="text-xs text-lime-accent bg-lime-accent/10 px-2.5 py-1 rounded-full">Recomp Active</span>
+        </div>
+
+        <div>
+          <div class="flex justify-between text-xs text-slate-400 mb-2">
+            <span>Weight vs. Waist Trend</span>
+            <span class="text-white font-semibold">3 Week History</span>
+          </div>
+          <div class="h-44 w-full">
+            <canvas id="progressChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Evidence Recomposition Coaching Box -->
+      <div class="glass-card p-4 border-l-4 border-l-blue-400 space-y-2">
+        <h3 class="text-xs font-bold text-blue-400 uppercase tracking-wider">Evidence Coaching Verdict</h3>
+        <p class="text-xs text-slate-300 leading-relaxed">
+          <strong>Stable weight (210 lbs) + Shrinking Waistline:</strong> Indicates active body recomposition (gaining lean mass while shedding adipose tissue). <em>Do not cut calories.</em> Maintain current energy intake and reassess in 2–3 weeks.
+        </p>
+      </div>
+    </section>
+
+    <!-- View 4: Supplement Label Advisor (Pillar 4) -->
+    <section id="view-supplements" class="hidden space-y-4">
+      <div class="glass-card p-5 space-y-4">
+        <h2 class="text-base font-bold text-white">Supplement Label Advisor</h2>
+        <p class="text-xs text-slate-400">Compare actual entered nutrition labels. Neither product burns fat directly.</p>
+
+        <div class="grid grid-cols-2 gap-3 text-xs">
+          <div class="bg-dark-input p-3 rounded-xl space-y-2">
+            <h3 class="font-bold text-lime-accent">Whey Isolate</h3>
+            <p class="text-[11px] text-slate-300">Lower in carbs, lactose, and fats. Ideal for post-workout precision.</p>
+          </div>
+          <div class="bg-dark-input p-3 rounded-xl space-y-2">
+            <h3 class="font-bold text-blue-400">Whey Blend</h3>
+            <p class="text-[11px] text-slate-300">Contains concentrate + isolate. Cost-effective protein source.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- View 5: Gemini AI Coach (Pillar 7) -->
+    <section id="view-coach" class="hidden space-y-4">
+      <div class="glass-card p-4 h-[420px] flex flex-col justify-between">
+        <div class="flex items-center gap-2 border-b border-dark-border pb-3">
+          <div class="w-7 h-7 rounded-lg bg-lime-accent text-black font-bold flex items-center justify-center text-xs">AI</div>
+          <div>
+            <h3 class="text-xs font-bold text-white">Kalo Evidence Nutrition Coach</h3>
+            <p class="text-[10px] text-slate-400">Powered by Gemini AI</p>
+          </div>
+        </div>
+
+        <div id="chat-box" class="flex-1 overflow-y-auto space-y-3 my-3 pr-1 text-xs">
+          <div class="bg-dark-input p-3 rounded-xl max-w-[85%] text-slate-200">
+            Hello Jane! How can I assist with your recomposition meal plan or supplement timing today?
+          </div>
+        </div>
+
+        <div class="flex gap-2">
+          <input type="text" id="chat-input" placeholder="Ask about meal timing, protein, or workouts..." class="flex-1 bg-dark-input text-xs text-white border border-dark-border rounded-xl px-3 py-2.5 focus:outline-none focus:border-lime-accent">
+          <button onclick="sendChatMessage()" class="bg-lime-accent hover:bg-lime-hover text-black font-bold text-xs px-4 py-2.5 rounded-xl transition-all">Send</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Add Meal Modal -->
+  <div id="meal-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="glass-card w-full max-w-sm p-5 space-y-4">
+      <h3 class="text-sm font-bold text-white">Add Custom Meal</h3>
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="text-slate-400">Meal Name</label>
+          <input type="text" id="modal-meal-name" placeholder="e.g. Grilled Chicken & Rice" class="w-full bg-dark-input text-white border border-dark-border rounded-xl px-3 py-2 mt-1 focus:outline-none focus:border-lime-accent">
+        </div>
+        <div>
+          <label class="text-slate-400">Category</label>
+          <select id="modal-meal-category" class="w-full bg-dark-input text-white border border-dark-border rounded-xl px-3 py-2 mt-1">
+            <option value="Breakfast">Breakfast</option>
+            <option value="Lunch">Lunch</option>
+            <option value="Dinner">Dinner</option>
+            <option value="Snacks">Snacks</option>
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="text-slate-400">Calories (kcal)</label>
+            <input type="number" id="modal-meal-cal" placeholder="450" class="w-full bg-dark-input text-white border border-dark-border rounded-xl px-3 py-2 mt-1">
+          </div>
+          <div>
+            <label class="text-slate-400">Protein (g)</label>
+            <input type="number" id="modal-meal-protein" placeholder="35" class="w-full bg-dark-input text-white border border-dark-border rounded-xl px-3 py-2 mt-1">
+          </div>
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button onclick="closeMealModal()" class="text-xs text-slate-400 hover:text-white px-3 py-2">Cancel</button>
+        <button onclick="saveCustomMeal()" class="text-xs bg-lime-accent hover:bg-lime-hover text-black font-semibold px-4 py-2 rounded-xl">Save Meal</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Optional Workout Log Modal -->
+  <div id="workout-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="glass-card w-full max-w-sm p-5 space-y-4">
+      <h3 class="text-sm font-bold text-white">Log Workout Session</h3>
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="text-slate-400">Workout Name</label>
+          <input type="text" id="modal-workout-name" placeholder="e.g. Leg Day / 5K Run" class="w-full bg-dark-input text-white border border-dark-border rounded-xl px-3 py-2 mt-1 focus:outline-none focus:border-lime-accent">
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="text-slate-400">Duration (mins)</label>
+            <input type="number" id="modal-workout-duration" placeholder="45" class="w-full bg-dark-input text-white border border-dark-border rounded-xl px-3 py-2 mt-1">
+          </div>
+          <div>
+            <label class="text-slate-400">Est. Burn (kcal)</label>
+            <input type="number" id="modal-workout-burn" placeholder="300" class="w-full bg-dark-input text-white border border-dark-border rounded-xl px-3 py-2 mt-1">
+          </div>
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button onclick="toggleWorkoutModal()" class="text-xs text-slate-400 hover:text-white px-3 py-2">Cancel</button>
+        <button onclick="saveWorkoutSession()" class="text-xs bg-lime-accent hover:bg-lime-hover text-black font-semibold px-4 py-2 rounded-xl">Save Session</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- iOS-Style Floating Dock Navigation -->
+  <nav class="fixed bottom-0 left-0 right-0 z-40 bottom-dock py-2 px-6">
+    <div class="max-w-md mx-auto flex items-center justify-between">
+      <button onclick="switchTab('today')" id="tab-today" class="flex flex-col items-center gap-1 text-lime-accent">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        <span class="text-[10px] font-medium">Today</span>
+      </button>
+
+      <button onclick="switchTab('calculator')" id="tab-calculator" class="flex flex-col items-center gap-1 text-slate-400 hover:text-white">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+        <span class="text-[10px] font-medium">Macros</span>
+      </button>
+
+      <button onclick="openMealModal()" class="w-11 h-11 rounded-full bg-lime-accent text-black font-extrabold flex items-center justify-center text-xl shadow-lg shadow-lime-accent/20 transform -translate-y-2 hover:scale-105 transition-all">
+        +
+      </button>
+
+      <button onclick="switchTab('progress')" id="tab-progress" class="flex flex-col items-center gap-1 text-slate-400 hover:text-white">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        <span class="text-[10px] font-medium">Progress</span>
+      </button>
+
+      <button onclick="switchTab('coach')" id="tab-coach" class="flex flex-col items-center gap-1 text-slate-400 hover:text-white">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+        <span class="text-[10px] font-medium">AI Coach</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Application Logic Scripts -->
+  <script>
+    // State Store
+    let currentClient = "jane_doe";
+    
+    let clientData = {
+      jane_doe: {
+        name: "Jane Doe",
+        targetCal: 1850,
+        proteinTarget: 150,
+        carbTarget: 178,
+        fatTarget: 60,
+        meals: [
+          { id: 1, name: "Oatmeal with Protein & Berries", cal: 450, p: 35, category: "Breakfast" },
+          { id: 2, name: "Grilled Chicken & Quinoa Salad", cal: 520, p: 45, category: "Lunch" },
+          { id: 3, name: "Salmon & Roasted Asparagus", cal: 450, p: 35, category: "Dinner" }
+        ],
+        groceries: ["Chicken Breast (2 lbs)", "Rolled Oats", "Whey Isolate", "Quinoa", "Asparagus", "Greek Yogurt"]
+      },
+      alex_smith: {
+        name: "Alex Smith",
+        targetCal: 2450,
+        proteinTarget: 180,
+        carbTarget: 260,
+        fatTarget: 75,
+        meals: [
+          { id: 1, name: "Eggs, Toast & Avocado", cal: 600, p: 40, category: "Breakfast" },
+          { id: 2, name: "Double Beef Rice Bowl", cal: 850, p: 60, category: "Lunch" }
+        ],
+        groceries: ["Lean Ground Beef", "Jasmine Rice", "Avocados", "Eggs", "Whole Milk"]
+      }
+    };
+
+    // Firebase Auth Hook (Backend Ready)
+    function loginWithGoogle() {
+      alert("Firebase Google Auth hook active. Connect your Firebase project config keys in index.html to authorize live accounts.");
+    }
+
+    // Render Meals
+    function renderMeals() {
+      const container = document.getElementById('meal-list-container');
+      const data = clientData[currentClient];
+      container.innerHTML = '';
+
+      let consumedCal = 0;
+      let consumedP = 0;
+
+      data.meals.forEach(meal => {
+        consumedCal += meal.cal;
+        consumedP += meal.p;
+
+        const card = document.createElement('div');
+        card.className = "glass-card p-3.5 flex items-center justify-between";
+        card.innerHTML = `
+          <div>
+            <span class="text-[10px] font-semibold text-lime-accent uppercase">${meal.category}</span>
+            <h4 class="text-xs font-bold text-white">${meal.name}</h4>
+            <p class="text-[11px] text-slate-400">${meal.cal} kcal • ${meal.p}g protein</p>
+          </div>
+          <button onclick="removeMeal(${meal.id})" class="text-xs text-red-400 hover:text-red-300 font-medium px-2 py-1 bg-red-400/10 rounded-lg">
+            Remove
+          </button>
+        `;
+        container.appendChild(card);
+      });
+
+      // Update Calorie Counters
+      document.getElementById('consumed-cal').innerText = consumedCal.toLocaleString();
+      document.getElementById('target-cal').innerText = data.targetCal.toLocaleString();
+      
+      const remaining = data.targetCal - consumedCal;
+      document.getElementById('remaining-cal').innerText = `${remaining} Kcal`;
+      document.getElementById('protein-count').innerText = `${consumedP}/${data.proteinTarget}g`;
+      document.getElementById('protein-bar').style.width = `${Math.min(100, (consumedP / data.proteinTarget) * 100)}%`;
+    }
+
+    // Add & Remove Meals
+    function removeMeal(id) {
+      clientData[currentClient].meals = clientData[currentClient].meals.filter(m => m.id !== id);
+      renderMeals();
+    }
+
+    function openMealModal() { document.getElementById('meal-modal').classList.remove('hidden'); }
+    function closeMealModal() { document.getElementById('meal-modal').classList.add('hidden'); }
+
+    function saveCustomMeal() {
+      const name = document.getElementById('modal-meal-name').value || "Custom Meal";
+      const category = document.getElementById('modal-meal-category').value;
+      const cal = parseInt(document.getElementById('modal-meal-cal').value) || 350;
+      const p = parseInt(document.getElementById('modal-meal-protein').value) || 25;
+
+      clientData[currentClient].meals.push({ id: Date.now(), name, category, cal, p });
+      closeMealModal();
+      renderMeals();
+    }
+
+    // Grocery List Logic
+    function renderGroceries() {
+      const container = document.getElementById('grocery-items-list');
+      container.innerHTML = '';
+      clientData[currentClient].groceries.forEach((item, index) => {
+        const row = document.createElement('div');
+        row.className = "flex items-center justify-between text-xs bg-dark-input p-2 rounded-lg";
+        row.innerHTML = `
+          <div class="flex items-center gap-2">
+            <input type="checkbox" class="accent-lime-accent rounded">
+            <span class="text-slate-200">${item}</span>
+          </div>
+          <button onclick="removeGroceryItem(${index})" class="text-slate-500 hover:text-red-400">×</button>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    function addGroceryItem() {
+      const input = document.getElementById('new-grocery-item');
+      if (input.value.trim()) {
+        clientData[currentClient].groceries.push(input.value.trim());
+        input.value = '';
+        renderGroceries();
+      }
+    }
+
+    function removeGroceryItem(index) {
+      clientData[currentClient].groceries.splice(index, 1);
+      renderGroceries();
+    }
+
+    // Workout Log Modal
+    function toggleWorkoutModal() {
+      const modal = document.getElementById('workout-modal');
+      modal.classList.toggle('hidden');
+    }
+
+    function saveWorkoutSession() {
+      const name = document.getElementById('modal-workout-name').value || "Workout Session";
+      const duration = document.getElementById('modal-workout-duration').value || "45";
+      const burn = document.getElementById('modal-workout-burn').value || "300";
+
+      const container = document.getElementById('logged-workouts-container');
+      const card = document.createElement('div');
+      card.className = "bg-dark-input p-2.5 rounded-xl flex items-center justify-between";
+      card.innerHTML = `
+        <div>
+          <p class="font-semibold text-white">${name}</p>
+          <p class="text-[10px] text-slate-400">${duration} mins • ${burn} kcal est.</p>
+        </div>
+        <span class="text-[10px] bg-lime-accent/20 text-lime-accent px-2 py-0.5 rounded font-medium">Logged</span>
+      `;
+      container.appendChild(card);
+      toggleWorkoutModal();
+    }
+
+    // Switch Tab Views
+    function switchTab(tabId) {
+      ['today', 'calculator', 'progress', 'supplements', 'coach'].forEach(id => {
+        const view = document.getElementById(`view-${id}`);
+        const btn = document.getElementById(`tab-${id}`);
+        if (view) view.classList.add('hidden');
+        if (btn) btn.className = "flex flex-col items-center gap-1 text-slate-400 hover:text-white";
+      });
+
+      document.getElementById(`view-${tabId}`).classList.remove('hidden');
+      const activeBtn = document.getElementById(`tab-${tabId}`);
+      if (activeBtn) activeBtn.className = "flex flex-col items-center gap-1 text-lime-accent";
+    }
+
+    function switchClient(key) {
+      currentClient = key;
+      document.getElementById('client-header-subtitle').innerText = `Active Client: ${clientData[key].name}`;
+      renderMeals();
+      renderGroceries();
+    }
+
+    // AI Chat Simulation
+    function sendChatMessage() {
+      const input = document.getElementById('chat-input');
+      const box = document.getElementById('chat-box');
+      if (!input.value.trim()) return;
+
+      const userMsg = document.createElement('div');
+      userMsg.className = "bg-lime-accent/10 border border-lime-accent/20 p-3 rounded-xl max-w-[85%] ml-auto text-lime-accent font-medium";
+      userMsg.innerText = input.value;
+      box.appendChild(userMsg);
+
+      const reply = document.createElement('div');
+      reply.className = "bg-dark-input p-3 rounded-xl max-w-[85%] text-slate-200";
+      reply.innerText = "For your current recomposition target, ensure your post-workout meal contains at least 30-40g of protein and moderate carbs to aid muscle recovery.";
+      
+      setTimeout(() => {
+        box.appendChild(reply);
+        box.scrollTop = box.scrollHeight;
+      }, 500);
+
+      input.value = '';
+    }
+
+    // Initialize Progress Chart
+    window.onload = () => {
+      renderMeals();
+      renderGroceries();
+
+      const ctx = document.getElementById('progressChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: ['W1', 'W2', 'W3'],
+          datasets: [
+            { label: 'Weight (lbs)', data: [210, 210, 210], borderColor: '#A3E635', tension: 0.3 },
+            { label: 'Waist (in)', data: [34, 33.2, 32.5], borderColor: '#60A5FA', tension: 0.3 }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: '#9CA3AF', font: { size: 10 } } } },
+          scales: {
+            x: { grid: { color: '#212A38' }, ticks: { color: '#9CA3AF' } },
+            y: { grid: { color: '#212A38' }, ticks: { color: '#9CA3AF' } }
+          }
+        }
+      });
+    };
+  </script>
+</body>
+</html>
